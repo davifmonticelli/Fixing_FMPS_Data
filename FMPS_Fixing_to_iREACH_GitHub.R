@@ -1,4 +1,4 @@
-# Script created by: Davi de Ferreyro Monticelli (PhD student in Atmospheric Sciences at University of British Columbia
+# Script created by: Davi de Ferreyro Monticelli (PhD student in Atmospheric Sciences at University of British Columbia)
 # Supervisor: Dr. Naomi Zimmermnan
 # Version: 1.0.0
 # Date: 2023-04-06
