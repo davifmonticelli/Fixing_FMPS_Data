@@ -578,6 +578,9 @@ for (date in common_dates) {
   # Add a legend
   legend("topright", legend = c("FMPS_raw", "FMPS_fixed"), col = c("blue", "red"), pch = c(17, 15), lty = c(1, 1))
   
+  # Clean aux dataframes
+  rm(fmps_corr_df)
+  rm(fmps_raw_df)
 }
 
 
