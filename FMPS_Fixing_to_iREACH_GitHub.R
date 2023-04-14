@@ -1,4 +1,4 @@
-# Script created by: Davi de Ferreyro Monticelli (PhD student in Atmospheric Sciences at University of British Columbia)
+# Script created by: Davi de Ferreyro Monticelli (PhD student in Atmospheric Sciences at University of British Columbia
 # Supervisor: Dr. Naomi Zimmermnan
 # Version: 1.0.0
 # Date: 2023-04-06
@@ -529,6 +529,57 @@ for (object_name in Merged_df_names){
   rm(FMPS_Corrected_XX_XX_XX)
   rm(FMPS_and_WCPC_XX_XX_XX)
 }
+
+####################################################################################
+# step 12: Plot results 
+# (check the outcomes)
+####################################################################################
+
+# Find FMPS and FMPS_Corrected dataframes in the R Global Environment based on their name
+FMPS_raw_names <- ls(pattern = "FMPS_[0-9]{2}_[0-9]{2}_[0-9]{2}$")
+FMPS_corrected_names <- ls(pattern = "FMPS_Corrected_[0-9]{2}_[0-9]{2}_[0-9]{2}$")
+
+# Get the unique dates from the WCPC and FMPS dataframe names
+FMPS_raw_dates <- unique(sub("FMPS_", "", FMPS_raw_names))
+FMPS_corrected_dates <- unique(sub("FMPS_Corrected_", "", FMPS_corrected_names))
+
+# Find the dates that are common to both WCPC and FMPS dataframes
+common_dates <- intersect(FMPS_raw_dates, FMPS_corrected_dates)
+
+# Iterate over the 15 pairs of dataframes
+for (date in common_dates) {
+  fmps_raw_df <- get(paste0("FMPS_", date))
+  fmps_raw_df[,2:33] <- fmps_raw_df[,2:33]/16
+  fmps_raw_df$date <- as.POSIXct(fmps_raw_df$date)
+  fmps_corr_df <- get(paste0("FMPS_Corrected_", date))
+  fmps_corr_df$date <- as.POSIXct(fmps_corr_df$date)
+  # Find the common timestamps
+  common_timestamps <- intersect(fmps_raw_df$date, fmps_corr_df$date)
+  # Randomly select a timestamp from the common timestamps
+  selected_timestamp <- sample(common_timestamps, 1)
+  # Extract the measurements for each size bin at the selected timestamp
+  fmps_measurements <- fmps_raw_df[fmps_raw_df$date == selected_timestamp, 2:33]
+  corrected_measurements <- fmps_corr_df[fmps_corr_df$date == selected_timestamp, 2:33]
+  size_bins <- c(6.04,6.98,8.06,9.31,10.8,12.4,14.3,16.5,19.1,22.1,25.5,29.4,34,39.2,45.3,52.3,60.4,69.8,95.2,114.1,138.9,167.6,200.8,239.1,283.3,334.4,393.3,461.5,540.0,630.8,735.8,856.8)
+  selected_timestamp <- as.POSIXct(selected_timestamp, origin = "1970-01-01 00:00:00")
+  # Create a new plot
+  #timestamp <- format(selected_timestamp, "%H:%M:%S")
+  plot(x = size_bins, y = fmps_measurements[1,], ylim = c(0, 1.2*max(fmps_measurements, corrected_measurements)), log = "x", xlab = "Diameter (nm)", ylab = "Concentration (#/cm^3)", main = paste0("Time: ", selected_timestamp))
+  # Add a solid black border to the plot
+  box()
+  # Add a dashed light gray grid to the plot
+  grid(lty = "dotted", col = "lightgray")
+  # Add the FMPS_raw line and data points
+  lines(x = size_bins, y = fmps_measurements[1,], type = "b", col = "blue")
+  points(x = size_bins, y = fmps_measurements[1,], pch = 17, col = "blue")
+  # Add the FMPS_fixed line and data points
+  lines(x = size_bins, y = corrected_measurements[1,], type = "b", col = "red")
+  points(x = size_bins, y = corrected_measurements[1,], pch = 15, col = "red")
+  # Add a legend
+  legend("topright", legend = c("FMPS_raw", "FMPS_fixed"), col = c("blue", "red"), pch = c(17, 15), lty = c(1, 1))
+  
+}
+
 
 #################################################################################################################
 # EXTRA STEP: Get the Count Median Diameter (CMD) and Geometric Standard Deviation (GSD) from corrected FMPS data 
