@@ -1,7 +1,7 @@
 # Script created by: Davi de Ferreyro Monticelli (PhD student in Atmospheric Sciences at University of British Columbia
 # Supervisor: Dr. Naomi Zimmermnan
 # Version: 1.0.0
-# Date: 2023-04-06
+# Date: 2023-04-17
 # Objective: Read TSI WCPC and FMPS data, modify files to account for lag time and time series alignement, and change FMPS signal
 #            according to Zimmerman et al. (2015) paper (https://wwww.sciencedirect.com/science/article/pii/S1352231014008516)
 
@@ -9,7 +9,7 @@
 # FMPS: Fast Mobility Particle Spectrometer
 
 ##############################################################################
-# step 1: Load raw FMPS and WCPC data
+# Step 1: Load raw FMPS and WCPC data
 ##############################################################################
 
 library(readxl) # input files are .xlsx (but code can be easily modified if they are .csv)
@@ -104,9 +104,61 @@ for(file in file_list) {
   rm(aux_dataframe)
 }
 
+##############################################################################
+# Step 2: Run data cleaning (get rid of equal time data points)
+##############################################################################
+
+# Also rare but sometimes I've faced the following situation, especially with WCPC data:
+
+# Example:
+# date                     WCPC
+# 2022-08-02  8:18:06 AM   2233.23
+# 2022-08-02  8:18:07 AM   2233.23
+# 2022-08-02  8:18:07 AM   2233.23  <<< repeated one second
+# 2022-08-02  8:18:08 AM   2233.23
+# 2022-08-02  8:18:09 AM   2233.23
+# 2022-08-02  8:18:10 AM   2233.23
+
+# Get a list of all WCPC and FMPS objects in the R Global Environment
+object_list <- ls(pattern = "^FMPS_")
+object_list <- append(object_list, ls(pattern = "^WCPC_"))
+
+# Loop over each object in the list and execute a function that checks for duplicates:
+for (object_name in object_list) {
+  # Create auxiliary dataframe
+  aux_dataframe = get(object_name)
+  
+  # Check for duplicates in the "date" column
+  duplicates <- aux_dataframe$date[duplicated(aux_dataframe$date)]
+  
+  # If there are duplicates, remove the latest one (also print warning)
+  if (length(duplicates) > 0) {
+    print(paste("Object named:", object_name, " had a date duplicate. Better verify."))
+    for (i in duplicates) {
+      aux_dataframe <- aux_dataframe[-which.max(aux_dataframe$date == i),]
+    }
+  }
+  
+  # Get the unique dates from the WCPC and FMPS dataframe names
+  if (grepl("^WCPC", object_name)){
+    unique_dates <- unique(sub("WCPC_", "", object_name))}
+  else if (grepl("^FMPS", object_name)){
+    unique_dates <- unique(sub("FMPS_", "", object_name)) 
+  }
+  
+  # For each unique date, re-write the corresponding WCPC and FMPS merged dataframes based on date
+  for (date in unique_dates) {
+    if (grepl("^WCPC", object_name)){
+      assign(paste0("WCPC_", date), aux_dataframe)}
+    else if (grepl("^FMPS", object_name)){
+      assign(paste0("FMPS_", date), aux_dataframe)} 
+  }
+  rm(aux_dataframe) # remove auxiliary dataframe
+}
+
 
 ##############################################################################
-# step 2: Run OpenAir timeAverage function to fix glitches (not accounted seconds)
+# Step 3: Run OpenAir timeAverage function to fix glitches (not accounted seconds)
 ##############################################################################
 
 # Super rare but sometimes I've faced the following situation, especially with WCPC data:
@@ -124,10 +176,6 @@ for(file in file_list) {
 
 library(openair)
 library(tidyverse)
-
-# Get a list of all WCPC and FMPS objects in the R Global Environment
-object_list <- ls(pattern = "^FMPS_")
-object_list <- append(object_list, ls(pattern = "^WCPC_"))
 
 # Loop over each object in the list and execute a function
 for (object_name in object_list) {
@@ -171,58 +219,7 @@ for (object_name in object_list) {
 
 
 ##############################################################################
-# step 3: Run data cleaning (get rid of equal time data points)
-##############################################################################
-
-# Also rare but sometimes I've faced the following situation, especially with WCPC data:
-
-# Example:
-# date                     WCPC
-# 2022-08-02  8:18:06 AM   2233.23
-# 2022-08-02  8:18:07 AM   2233.23
-# 2022-08-02  8:18:07 AM   2233.23  <<< repeated one second
-# 2022-08-02  8:18:08 AM   2233.23
-# 2022-08-02  8:18:09 AM   2233.23
-# 2022-08-02  8:18:10 AM   2233.23
-
-# We use the same object_list from Step 2
-
-# Loop over each object in the list and execute a function that checks for duplicates:
-for (object_name in object_list) {
-    # Create auxiliary dataframe
-    aux_dataframe = get(object_name)
-    
-    # Check for duplicates in the "date" column
-    duplicates <- aux_dataframe$date[duplicated(aux_dataframe$date)]
-    
-    # If there are duplicates, remove the latest one (also print warning)
-    if (length(duplicates) > 0) {
-      print(paste("Object named:", object_name, " had a date duplicate. Better verify."))
-      for (i in duplicates) {
-        aux_dataframe <- aux_dataframe[-which.max(aux_dataframe$date == i),]
-      }
-    }
-    
-    # Get the unique dates from the WCPC and FMPS dataframe names
-    if (grepl("^WCPC", object_name)){
-      unique_dates <- unique(sub("WCPC_", "", object_name))}
-    else if (grepl("^FMPS", object_name)){
-      unique_dates <- unique(sub("FMPS_", "", object_name)) 
-    }
-    
-    # For each unique date, re-write the corresponding WCPC and FMPS merged dataframes based on date
-    for (date in unique_dates) {
-      if (grepl("^WCPC", object_name)){
-        assign(paste0("WCPC_", date), aux_dataframe)}
-      else if (grepl("^FMPS", object_name)){
-        assign(paste0("FMPS_", date), aux_dataframe)} 
-    }
-    rm(aux_dataframe) # remove auxiliary dataframe
-}
-
-
-##############################################################################
-# step 4: Merge FMPS and WCPC data by time (using file names)
+# Step 4: Merge FMPS and WCPC data by time (using file names)
 ##############################################################################
 
 # Find WCPC and FMPS dataframes in the R Global Environment based on their name
@@ -252,7 +249,7 @@ for (date in common_dates) {
 }
 
 ##############################################################################
-# step 5: Make data lag X sec for each merged dataframe
+# Step 5: Make data lag X sec for each merged dataframe
 ##############################################################################
 
 # This is case of a mobile monitoring application where the concentration measured
@@ -309,7 +306,7 @@ for (object_name in Merged_df_names) {
 
 
 ##############################################################################
-# step 6: Fix FMPS data dividing everything by 16
+# Step 6: Fix FMPS data dividing everything by 16
 ##############################################################################
 
 # Loop over each object in the "Merged_df_list" and execute a function
@@ -334,7 +331,7 @@ for (object_name in Merged_df_names) {
 
 
 ####################################################################################
-# step 7: Adjust FMPS data using the Tables 2 and 3 from Zimmerman et al. 2015 paper
+# Step 7: Adjust FMPS data using the Tables 2 and 3 from Zimmerman et al. 2015 paper
 ####################################################################################
 
 mid_point = c("D6.04", "D6.98", "D8.06", "D9.31", "D10.8", "D12.4", "D14.3", "D16.5", "D19.1", "D22.1", "D25.5", "D29.4", "D34", "D39.2", "D45.3", "D52.3", "D60.4", "D69.8", "D80.6", "D93.1", "D107.5", "D124.1", "D143.3", "D165.5", "D191.1", "D220.7", "D254.8", "D294.3", "D339.8", "D392.4", "D453.2", "D523.3")
@@ -372,7 +369,7 @@ for (object_name in Merged_df_names){
 
 
 ####################################################################################
-# step 8: Get total particle count from FMPS (adds new column to dataframe)
+# Step 8: Get total particle count from FMPS (adds new column to dataframe)
 ####################################################################################
 
 #Get the total particle count per row (second)
@@ -393,7 +390,7 @@ for (object_name in Merged_df_names){
 
 
 ####################################################################################
-# step 9: Align the datasets based on the Cross Correlation Factor
+# Step 9: Align the datasets based on the Cross Correlation Factor
 ####################################################################################
 
 # This step is necessary if in your sampling setup the lines that transport particles to the WCPC and FMPS have different lengths
@@ -464,7 +461,7 @@ for (object_name in Merged_df_names){
 }
 
 ####################################################################################
-# step 10: Adjust FMPS data using WCPC ratio (see Zimmerman et al. 2015)
+# Step 10: Adjust FMPS data using WCPC ratio (see Zimmerman et al. 2015)
 ####################################################################################
 
 # Note: if the user does not want the FMPS and WCPC concentration values to be the same (for comparison), skip this step.
@@ -490,7 +487,7 @@ for (object_name in Merged_df_names){
 }  
 
 ####################################################################################
-# step 11: Save everything 
+# Step 11: Save everything 
 # (also make sure format is compatible with "Getting_CMD_and_GSD" script)
 ####################################################################################
 
@@ -531,7 +528,7 @@ for (object_name in Merged_df_names){
 }
 
 ####################################################################################
-# step 12: Plot results 
+# Step 12: Plot results 
 # (check the outcomes)
 ####################################################################################
 
